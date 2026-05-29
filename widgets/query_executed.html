@@ -6,6 +6,7 @@
   <div class="bcn-header">
     <span class="bcn-badge">EXECUTED</span>
     <span id="bcn-title" class="bcn-title"></span>
+    <button id="bcn-recipe-btn" class="bcn-recipe-btn" style="display:none;">Recipe ▾</button>
   </div>
   <div style="overflow-x:auto;overflow-y:auto;max-height:320px;">
     <table id="bcn-table" class="bcn-table">
@@ -14,6 +15,7 @@
     </table>
     <div id="bcn-empty" class="bcn-empty" style="display:none;">No results.</div>
   </div>
+  <div id="bcn-recipe" class="bcn-recipe" style="display:none;"></div>
 </div>
 
 <style>
@@ -25,10 +27,12 @@
     --bcn-text-primary: #111827;
     --bcn-text-body: #374151;
     --bcn-text-muted: #6B7280;
+    --bcn-text-subtle: #9CA3AF;
     --bcn-scrollbar: #D1D5DB;
     --bcn-scrollbar-hover: #9CA3AF;
     --bcn-gradient: linear-gradient(to right, #4A9FFF, #7C3AED);
     --bcn-row-hover: linear-gradient(to right, rgba(74,159,255,.04), rgba(124,58,237,.04));
+    --bcn-blue: #4A9FFF;
     --bcn-error: #DC2626;
   }
   @media (prefers-color-scheme: dark) {
@@ -40,9 +44,11 @@
       --bcn-text-primary: #F9FAFB;
       --bcn-text-body: #E5E7EB;
       --bcn-text-muted: #9CA3AF;
+      --bcn-text-subtle: #6B7280;
       --bcn-scrollbar: #374151;
       --bcn-scrollbar-hover: #4B5563;
       --bcn-row-hover: linear-gradient(to right, rgba(74,159,255,.07), rgba(124,58,237,.07));
+      --bcn-blue: #4A9FFF;
       --bcn-error: #F87171;
     }
   }
@@ -83,7 +89,21 @@
     -webkit-text-fill-color:transparent;
     background-clip:text;
   }
-  .bcn-title { font-size:13px; font-weight:600; color:var(--bcn-text-primary); }
+  .bcn-title { font-size:13px; font-weight:600; color:var(--bcn-text-primary); flex:1; }
+  .bcn-recipe-btn {
+    font-size:11px;
+    font-weight:600;
+    color:var(--bcn-text-muted);
+    background:none;
+    border:1px solid var(--bcn-border);
+    border-radius:4px;
+    padding:3px 9px;
+    cursor:pointer;
+    transition:all 0.15s ease;
+    white-space:nowrap;
+    font-family:inherit;
+  }
+  .bcn-recipe-btn:hover { color:var(--bcn-blue); border-color:var(--bcn-blue); }
   .bcn-table { width:100%; border-collapse:collapse; font-size:12px; }
   .bcn-table th {
     padding:8px 12px;
@@ -99,7 +119,14 @@
     top:0;
     background:var(--bcn-surface);
     z-index:1;
+    cursor:pointer;
+    user-select:none;
+    transition:color 0.15s ease;
   }
+  .bcn-table th:hover { color:var(--bcn-text-body); }
+  .bcn-table th.bcn-sort-active { color:var(--bcn-blue); }
+  .bcn-sort-icon { font-size:9px; margin-left:3px; opacity:0.5; }
+  .bcn-sort-active .bcn-sort-icon { opacity:1; }
   .bcn-table td {
     padding:7px 12px;
     border-bottom:1px solid var(--bcn-divider);
@@ -110,6 +137,44 @@
   .bcn-table tr:last-child td { border-bottom:none; }
   .bcn-table tr:hover td { background:var(--bcn-row-hover); }
   .bcn-empty { padding:14px 20px; color:var(--bcn-text-muted); font-size:12px; }
+  .bcn-recipe {
+    border-top:1px solid var(--bcn-border);
+    background:var(--bcn-surface);
+    padding:14px 20px;
+    overflow-x:auto;
+  }
+  .bcn-recipe-section { margin-bottom:14px; }
+  .bcn-recipe-section:last-child { margin-bottom:0; }
+  .bcn-recipe-heading {
+    font-size:10px;
+    font-weight:700;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    color:var(--bcn-text-muted);
+    margin-bottom:6px;
+  }
+  .bcn-recipe-table { width:100%; border-collapse:collapse; font-size:11px; }
+  .bcn-recipe-table th {
+    padding:4px 8px;
+    text-align:left;
+    font-size:10px;
+    font-weight:600;
+    color:var(--bcn-text-subtle);
+    letter-spacing:.04em;
+    text-transform:uppercase;
+    border-bottom:1px solid var(--bcn-border);
+    white-space:nowrap;
+    cursor:default;
+    user-select:none;
+  }
+  .bcn-recipe-table td {
+    padding:4px 8px;
+    color:var(--bcn-text-body);
+    border-bottom:1px solid var(--bcn-divider);
+    white-space:nowrap;
+  }
+  .bcn-recipe-table tr:last-child td { border-bottom:none; }
+  .bcn-recipe-limit { font-size:12px; color:var(--bcn-text-body); }
   ::-webkit-scrollbar { width:6px; height:6px; }
   ::-webkit-scrollbar-track { background:var(--bcn-surface); }
   ::-webkit-scrollbar-thumb { background:var(--bcn-scrollbar); border-radius:3px; }
@@ -118,62 +183,44 @@
 </style>
 
 <script>
-  function render(output) {
-    document.getElementById("bcn-title").textContent = output.query_title || "";
+  var _rows = [];
+  var _cols = [];
+  var _numericCol = {};
+  var _colDecimals = {};
+  var _sortCol = null;
+  var _sortAsc = true;
+  var _recipeOpen = false;
+  var _recipeSortsTbody = null;
+  var _originalSorts = [];
 
-    var rows;
-    try {
-      rows = typeof output.result_json === "string"
-        ? JSON.parse(output.result_json)
-        : output.result_json;
-    } catch(e) { rows = []; }
-
-    if (!rows || rows.length === 0) {
-      document.getElementById("bcn-empty").style.display = "block";
-      return;
-    }
-
-    var cols = Object.keys(rows[0]);
-    var numericCol = {};
-    var colDecimals = {};
-    cols.forEach(function(c) {
-      var allNumeric = rows.every(function(r) {
-        var v = r[c];
-        if (v === null || v === undefined || v === "") return true;
-        return typeof v === "number" || (typeof v === "string" && v.trim() !== "" && isFinite(Number(v.replace(/,/g, ""))));
-      }) && rows.some(function(r) { return r[c] !== null && r[c] !== undefined && r[c] !== ""; });
-      numericCol[c] = allNumeric;
-      if (allNumeric) {
-        var maxDec = 0;
-        rows.forEach(function(r) {
-          var v = r[c];
-          if (v === null || v === undefined || v === "") return;
-          var dot = String(v).indexOf(".");
-          if (dot !== -1) maxDec = Math.max(maxDec, String(v).length - dot - 1);
-        });
-        colDecimals[c] = maxDec;
+  function sortedRows() {
+    if (_sortCol === null) return _rows;
+    var col = _sortCol;
+    var asc = _sortAsc;
+    return _rows.slice().sort(function(a, b) {
+      var av = a[col], bv = b[col];
+      if (_numericCol[col]) {
+        var an = (av === null || av === undefined || av === "") ? 0 : (typeof av === "number" ? av : parseFloat(String(av).replace(/,/g, "")));
+        var bn = (bv === null || bv === undefined || bv === "") ? 0 : (typeof bv === "number" ? bv : parseFloat(String(bv).replace(/,/g, "")));
+        return asc ? an - bn : bn - an;
       }
+      var as = String(av === null || av === undefined ? "" : av);
+      var bs = String(bv === null || bv === undefined ? "" : bv);
+      return asc ? as.localeCompare(bs) : bs.localeCompare(as);
     });
+  }
 
-    var thead = document.getElementById("bcn-thead");
-    var hr = document.createElement("tr");
-    cols.forEach(function(c) {
-      var th = document.createElement("th");
-      th.textContent = c;
-      if (numericCol[c]) th.style.textAlign = "right";
-      hr.appendChild(th);
-    });
-    thead.appendChild(hr);
-
+  function renderTbody() {
     var tbody = document.getElementById("bcn-tbody");
-    rows.forEach(function(row) {
+    tbody.innerHTML = "";
+    sortedRows().forEach(function(row) {
       var tr = document.createElement("tr");
-      cols.forEach(function(c) {
+      _cols.forEach(function(c) {
         var td = document.createElement("td");
         var v = row[c];
-        if (numericCol[c] && v !== null && v !== undefined && v !== "") {
+        if (_numericCol[c] && v !== null && v !== undefined && v !== "") {
           var n = typeof v === "number" ? v : parseFloat(String(v).replace(/,/g, ""));
-          td.textContent = isNaN(n) ? String(v) : n.toFixed(colDecimals[c]);
+          td.textContent = isNaN(n) ? String(v) : n.toFixed(_colDecimals[c]);
           td.style.textAlign = "right";
           td.style.fontVariantNumeric = "tabular-nums";
         } else {
@@ -183,6 +230,220 @@
       });
       tbody.appendChild(tr);
     });
+  }
+
+  function syncRecipeSorts() {
+    if (!_recipeSortsTbody) return;
+    _recipeSortsTbody.innerHTML = "";
+    var sorts = _sortCol !== null
+      ? [{ field: _sortCol, direction: _sortAsc ? "Ascending" : "Descending" }]
+      : _originalSorts;
+    if (sorts.length === 0) {
+      var tr = document.createElement("tr");
+      var td = document.createElement("td");
+      td.colSpan = 2;
+      td.textContent = "—";
+      td.style.color = "var(--bcn-text-subtle)";
+      tr.appendChild(td);
+      _recipeSortsTbody.appendChild(tr);
+      return;
+    }
+    sorts.forEach(function(s) {
+      var tr = document.createElement("tr");
+      [s.field, s.direction].forEach(function(cell) {
+        var td = document.createElement("td");
+        td.textContent = cell || "—";
+        tr.appendChild(td);
+      });
+      _recipeSortsTbody.appendChild(tr);
+    });
+  }
+
+  function updateSortHeaders() {
+    document.querySelectorAll("#bcn-thead th").forEach(function(th) {
+      var col = th.dataset.col;
+      var icon = th.querySelector(".bcn-sort-icon");
+      var isActive = col === _sortCol;
+      th.classList.toggle("bcn-sort-active", isActive);
+      if (icon) icon.textContent = isActive ? (_sortAsc ? "▲" : "▼") : "";
+    });
+    syncRecipeSorts();
+  }
+
+  function toggleRecipe() {
+    _recipeOpen = !_recipeOpen;
+    document.getElementById("bcn-recipe").style.display = _recipeOpen ? "" : "none";
+    document.getElementById("bcn-recipe-btn").textContent = _recipeOpen ? "Recipe ▴" : "Recipe ▾";
+  }
+
+  function renderRecipeSection(container, title, headers, rows) {
+    var section = document.createElement("div");
+    section.className = "bcn-recipe-section";
+    var heading = document.createElement("div");
+    heading.className = "bcn-recipe-heading";
+    heading.textContent = title;
+    section.appendChild(heading);
+    var table = document.createElement("table");
+    table.className = "bcn-recipe-table";
+    var thead = document.createElement("thead");
+    var hr = document.createElement("tr");
+    headers.forEach(function(h) {
+      var th = document.createElement("th");
+      th.textContent = h;
+      hr.appendChild(th);
+    });
+    thead.appendChild(hr);
+    table.appendChild(thead);
+    var tbody = document.createElement("tbody");
+    rows.forEach(function(rowData) {
+      var tr = document.createElement("tr");
+      rowData.forEach(function(cell) {
+        var td = document.createElement("td");
+        td.textContent = (cell !== null && cell !== undefined && String(cell) !== "") ? String(cell) : "—";
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    section.appendChild(table);
+    container.appendChild(section);
+  }
+
+  function renderRecipe(recipe, container) {
+    if (recipe.parameters && recipe.parameters.length > 0) {
+      renderRecipeSection(container, "Parameters", ["Parameter", "Value"],
+        recipe.parameters.map(function(p) { return [p.name, p.value]; }));
+    }
+    if (recipe.rows && recipe.rows.length > 0) {
+      renderRecipeSection(container, "Rows", ["Field", "Attributes"],
+        recipe.rows.map(function(r) {
+          return [r.field, r.attributes && r.attributes.length > 0 ? r.attributes.join(", ") : "—"];
+        }));
+    }
+    if (recipe.columns && recipe.columns.length > 0) {
+      renderRecipeSection(container, "Columns", ["Field", "Type", "Attributes"],
+        recipe.columns.map(function(c) {
+          if (c.type === "measure") return [c.field, "Measure", "—"];
+          return [c.field, "Dimension", c.attributes && c.attributes.length > 0 ? c.attributes.join(", ") : "—"];
+        }));
+    }
+    if (recipe.filters && recipe.filters.length > 0) {
+      renderRecipeSection(container, "Filters", ["Field", "Attribute", "Operator", "Value"],
+        recipe.filters.map(function(f) { return [f.field, f.attribute || "—", f.operator, f.value]; }));
+    }
+    _originalSorts = (recipe.sorts || []).map(function(s) { return { field: s.field, direction: s.direction }; });
+    var sortsSection = document.createElement("div");
+    sortsSection.className = "bcn-recipe-section";
+    var sortsHeading = document.createElement("div");
+    sortsHeading.className = "bcn-recipe-heading";
+    sortsHeading.textContent = "Sorts";
+    sortsSection.appendChild(sortsHeading);
+    var sortsTable = document.createElement("table");
+    sortsTable.className = "bcn-recipe-table";
+    var sortsThead = document.createElement("thead");
+    var sortsTr = document.createElement("tr");
+    ["Field", "Direction"].forEach(function(h) {
+      var th = document.createElement("th");
+      th.textContent = h;
+      sortsTr.appendChild(th);
+    });
+    sortsThead.appendChild(sortsTr);
+    sortsTable.appendChild(sortsThead);
+    _recipeSortsTbody = document.createElement("tbody");
+    sortsTable.appendChild(_recipeSortsTbody);
+    sortsSection.appendChild(sortsTable);
+    container.appendChild(sortsSection);
+    syncRecipeSorts();
+    if (recipe.limit != null) {
+      var section = document.createElement("div");
+      section.className = "bcn-recipe-section";
+      var heading = document.createElement("div");
+      heading.className = "bcn-recipe-heading";
+      heading.textContent = "Limit";
+      var value = document.createElement("div");
+      value.className = "bcn-recipe-limit";
+      value.textContent = recipe.limit.toLocaleString() + " rows";
+      section.appendChild(heading);
+      section.appendChild(value);
+      container.appendChild(section);
+    }
+  }
+
+  function render(output) {
+    document.getElementById("bcn-title").textContent = output.query_title || "";
+
+    var recipe = null;
+    try {
+      if (output.recipe_json) {
+        recipe = typeof output.recipe_json === "string"
+          ? JSON.parse(output.recipe_json)
+          : output.recipe_json;
+      }
+    } catch(e) {}
+
+    try {
+      _rows = typeof output.result_json === "string"
+        ? JSON.parse(output.result_json)
+        : output.result_json;
+    } catch(e) { _rows = []; }
+
+    if (!_rows || _rows.length === 0) {
+      document.getElementById("bcn-empty").style.display = "block";
+    } else {
+      _cols = Object.keys(_rows[0]);
+      _cols.forEach(function(c) {
+        var allNumeric = _rows.every(function(r) {
+          var v = r[c];
+          if (v === null || v === undefined || v === "") return true;
+          return typeof v === "number" || (typeof v === "string" && v.trim() !== "" && isFinite(Number(v.replace(/,/g, ""))));
+        }) && _rows.some(function(r) { return r[c] !== null && r[c] !== undefined && r[c] !== ""; });
+        _numericCol[c] = allNumeric;
+        if (allNumeric) {
+          var maxDec = 0;
+          _rows.forEach(function(r) {
+            var v = r[c];
+            if (v === null || v === undefined || v === "") return;
+            var dot = String(v).indexOf(".");
+            if (dot !== -1) maxDec = Math.max(maxDec, String(v).length - dot - 1);
+          });
+          _colDecimals[c] = maxDec;
+        }
+      });
+
+      var thead = document.getElementById("bcn-thead");
+      var hr = document.createElement("tr");
+      _cols.forEach(function(c) {
+        var th = document.createElement("th");
+        th.dataset.col = c;
+        if (_numericCol[c]) th.style.textAlign = "right";
+        var label = document.createElement("span");
+        label.textContent = c;
+        var icon = document.createElement("span");
+        icon.className = "bcn-sort-icon";
+        th.appendChild(label);
+        th.appendChild(icon);
+        th.onclick = function() {
+          if (_sortCol === c) {
+            _sortAsc = !_sortAsc;
+          } else {
+            _sortCol = c;
+            _sortAsc = true;
+          }
+          renderTbody();
+          updateSortHeaders();
+        };
+        hr.appendChild(th);
+      });
+      thead.appendChild(hr);
+      renderTbody();
+    }
+
+    if (recipe && Object.keys(recipe).length > 0) {
+      var btn = document.getElementById("bcn-recipe-btn");
+      btn.style.display = "";
+      btn.onclick = toggleRecipe;
+      renderRecipe(recipe, document.getElementById("bcn-recipe"));
+    }
   }
 
   function check() {

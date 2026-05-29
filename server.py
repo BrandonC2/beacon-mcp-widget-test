@@ -112,6 +112,115 @@ MOCK_HIERARCHY_DIRECTORY = [
     {"name": "Profit Center Hierarchy",  "id": "ZPC",   "is_default": False},
 ]
 
+MOCK_RECIPES: dict[str, dict[str, object]] = {
+    "ZSNAP_F01S_Q01": {
+        "rows": [
+            {"field": "Document Date", "attributes": []},
+            {"field": "Document Reference ID", "attributes": []},
+        ],
+        "columns": [
+            {"type": "measure", "field": "Amount in Display Currency"},
+            {"type": "measure", "field": "Number of Rows"},
+        ],
+        "filters": [{"field": "Company Code", "operator": "Equals", "value": "1000", "attribute": ""}],
+        "sorts": [{"field": "Amount in Display Currency", "direction": "Descending"}],
+        "limit": 10,
+    },
+    "ZSNAP_F02S_Q01": {
+        "rows": [
+            {"field": "Vendor ID", "attributes": []},
+            {"field": "Vendor Name", "attributes": []},
+        ],
+        "columns": [
+            {"type": "dimension", "field": "Country", "attributes": []},
+            {"type": "dimension", "field": "Payment Terms", "attributes": []},
+        ],
+    },
+    "ZSNAP_GL01_Q01": {
+        "rows": [{"field": "GL Account", "attributes": ["GL Account Name"]}],
+        "columns": [{"type": "measure", "field": "Balance"}],
+    },
+    "ZSNAP_MM01_Q01": {
+        "rows": [
+            {"field": "PO Number", "attributes": []},
+            {"field": "Vendor", "attributes": []},
+        ],
+        "columns": [
+            {"type": "measure", "field": "Net Value"},
+            {"type": "dimension", "field": "Status", "attributes": []},
+        ],
+        "filters": [{"field": "Status", "operator": "Equals", "value": "Open", "attribute": ""}],
+    },
+}
+
+
+MOCK_SCHEMAS: dict[str, str] = {
+    "ZSNAP_F01S_Q01": """\
+query: ZSNAP_F01S_Q01
+label: Open Accounts Payable
+parameters:
+  - name: CompanyCode
+    label: Company Code
+    required: true
+dimensions:
+  - field: DocumentDate
+    label: Document Date
+  - field: DocumentReferenceID
+    label: Document Reference ID
+  - field: Supplier
+    label: Supplier
+  - field: CompanyCode
+    label: Company Code
+measures:
+  - field: AmountInDisplayCurrency
+    label: Amount in Display Currency
+  - field: NumberOfRows
+    label: Number of Rows
+""",
+    "ZSNAP_F02S_Q01": """\
+query: ZSNAP_F02S_Q01
+label: Vendor Master Data
+dimensions:
+  - field: VendorID
+    label: Vendor ID
+  - field: VendorName
+    label: Vendor Name
+  - field: Country
+    label: Country
+  - field: PaymentTerms
+    label: Payment Terms
+""",
+    "ZSNAP_GL01_Q01": """\
+query: ZSNAP_GL01_Q01
+label: GL Account Balances
+parameters:
+  - name: FiscalYear
+    label: Fiscal Year
+    required: true
+dimensions:
+  - field: GLAccount
+    label: GL Account
+    hierarchies: [ZMED, ZCC]
+measures:
+  - field: Balance
+    label: Balance
+""",
+    "ZSNAP_MM01_Q01": """\
+query: ZSNAP_MM01_Q01
+label: Purchase Orders
+dimensions:
+  - field: PONumber
+    label: PO Number
+  - field: Vendor
+    label: Vendor
+  - field: Status
+    label: Status
+measures:
+  - field: NetValue
+    label: Net Value
+""",
+}
+
 
 mcp = FastMCP(
     "beacon-widget-test",
@@ -158,12 +267,15 @@ def prepare_query(query_name: str) -> types.CallToolResult:
     ZSNAP_GL01_Q01 (GL Account Balances),
     ZSNAP_MM01_Q01 (Purchase Orders).
     """
-    label = MOCK_QUERIES.get(query_name.upper(), "Unknown Query")
+    key = query_name.upper()
+    label = MOCK_QUERIES.get(key, "Unknown Query")
+    schema_yaml = MOCK_SCHEMAS.get(key, "")
     return types.CallToolResult.model_validate({
         "content": [{"type": "text", "text": f"Query {query_name} prepared. What would you like to analyze?"}],
         "structuredContent": {
-            "query_name": query_name.upper(),
+            "query_name": key,
             "query_label": label,
+            "schema_yaml": schema_yaml,
         },
     })
 
@@ -179,11 +291,13 @@ def data_preview(query_name: str, query_title: str) -> types.CallToolResult:
     query_title is a short human-readable description of what was asked.
     """
     data = MOCK_DATASETS.get(query_name.upper(), MOCK_AP_RESULT)
+    recipe = MOCK_RECIPES.get(query_name.upper(), {})
     return types.CallToolResult.model_validate({
         "content": [{"type": "text", "text": f"Results for {query_title}."}],
         "structuredContent": {
             "query_title": query_title,
             "result_json": json.dumps(data),
+            "recipe_json": json.dumps(recipe),
         },
     })
 
