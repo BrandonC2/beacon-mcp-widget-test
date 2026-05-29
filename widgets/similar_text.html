@@ -1,0 +1,210 @@
+<!doctype html>
+<html>
+<body class="bcn-body">
+
+<div id="bcn-wrap" class="bcn-wrap">
+  <div class="bcn-header">
+    <span class="bcn-badge">SIMILAR TEXT</span>
+    <span class="bcn-search-label">
+      searching <span id="bcn-search" class="bcn-search-term"></span>
+      in <span id="bcn-field" class="bcn-search-field"></span>
+    </span>
+  </div>
+  <div style="overflow-x:auto;">
+    <table id="bcn-table" class="bcn-table">
+      <thead id="bcn-thead"></thead>
+      <tbody id="bcn-tbody"></tbody>
+    </table>
+    <div id="bcn-empty" class="bcn-empty" style="display:none;">No matches found.</div>
+  </div>
+</div>
+
+<style>
+  :root {
+    --bcn-bg: #FFFFFF;
+    --bcn-surface: #F9FAFB;
+    --bcn-border: #E5E7EB;
+    --bcn-divider: #F3F4F6;
+    --bcn-text-primary: #111827;
+    --bcn-text-body: #374151;
+    --bcn-text-muted: #6B7280;
+    --bcn-scrollbar: #D1D5DB;
+    --bcn-scrollbar-hover: #9CA3AF;
+    --bcn-gradient: linear-gradient(to right, #4A9FFF, #7C3AED);
+    --bcn-row-hover: linear-gradient(to right, rgba(74,159,255,.04), rgba(124,58,237,.04));
+    --bcn-error: #DC2626;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bcn-bg: #111827;
+      --bcn-surface: #1F2937;
+      --bcn-border: #374151;
+      --bcn-divider: #1F2937;
+      --bcn-text-primary: #F9FAFB;
+      --bcn-text-body: #E5E7EB;
+      --bcn-text-muted: #9CA3AF;
+      --bcn-scrollbar: #374151;
+      --bcn-scrollbar-hover: #4B5563;
+      --bcn-row-hover: linear-gradient(to right, rgba(74,159,255,.07), rgba(124,58,237,.07));
+      --bcn-error: #F87171;
+    }
+  }
+  .bcn-body { margin:0; padding:0; background:var(--bcn-bg); display:inline-block; }
+  .bcn-wrap {
+    border-radius:12px;
+    background:var(--bcn-bg);
+    color:var(--bcn-text-body);
+    font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    border:1px solid var(--bcn-border);
+    overflow:clip;
+    min-width:300px;
+    max-width:700px;
+  }
+  .bcn-wrap::before {
+    content:'';
+    display:block;
+    height:3px;
+    background:var(--bcn-gradient);
+  }
+  .bcn-header {
+    padding:12px 20px;
+    background:var(--bcn-surface);
+    border-bottom:1px solid var(--bcn-border);
+    display:flex;
+    align-items:center;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+  .bcn-badge {
+    font-size:10px;
+    font-weight:700;
+    letter-spacing:.08em;
+    border-radius:4px;
+    padding:2px 7px;
+    border:1px solid var(--bcn-border);
+    background:var(--bcn-gradient);
+    -webkit-background-clip:text;
+    -webkit-text-fill-color:transparent;
+    background-clip:text;
+    white-space:nowrap;
+  }
+  .bcn-search-label { font-size:12px; color:var(--bcn-text-muted); white-space:nowrap; }
+  .bcn-search-term { color:var(--bcn-text-primary); font-style:italic; }
+  .bcn-search-field { color:var(--bcn-text-primary); }
+  .bcn-table { width:100%; border-collapse:collapse; font-size:12px; }
+  .bcn-table th {
+    padding:8px 12px;
+    text-align:left;
+    font-size:11px;
+    font-weight:600;
+    color:var(--bcn-text-muted);
+    border-bottom:1px solid var(--bcn-border);
+    white-space:nowrap;
+    letter-spacing:.04em;
+    text-transform:uppercase;
+    position:sticky;
+    top:0;
+    background:var(--bcn-surface);
+    z-index:1;
+  }
+  .bcn-table td {
+    padding:7px 12px;
+    border-bottom:1px solid var(--bcn-divider);
+    color:var(--bcn-text-body);
+    white-space:nowrap;
+    transition:all 0.15s ease;
+  }
+  .bcn-table tr:last-child td { border-bottom:none; }
+  .bcn-table tr:hover td { background:var(--bcn-row-hover); }
+  .bcn-empty { padding:14px 20px; color:var(--bcn-text-muted); font-size:12px; }
+  ::-webkit-scrollbar { width:6px; height:6px; }
+  ::-webkit-scrollbar-track { background:var(--bcn-surface); }
+  ::-webkit-scrollbar-thumb { background:var(--bcn-scrollbar); border-radius:3px; }
+  ::-webkit-scrollbar-thumb:hover { background:var(--bcn-scrollbar-hover); }
+  ::-webkit-scrollbar-corner { background:var(--bcn-surface); }
+</style>
+
+<script>
+  function render(output) {
+    document.getElementById("bcn-search").textContent = output.search_text
+      ? '"' + output.search_text + '"'
+      : "";
+    document.getElementById("bcn-field").textContent = output.field_label || "";
+
+    var rows;
+    try {
+      rows = typeof output.table_json === "string"
+        ? JSON.parse(output.table_json)
+        : output.table_json;
+    } catch(e) { rows = []; }
+
+    if (!rows || rows.length === 0) {
+      document.getElementById("bcn-empty").style.display = "block";
+      return;
+    }
+
+    var cols = Object.keys(rows[0]);
+    var numericCol = {};
+    var colDecimals = {};
+    cols.forEach(function(c) {
+      var allNumeric = rows.every(function(r) {
+        var v = r[c];
+        if (v === null || v === undefined || v === "") return true;
+        return typeof v === "number" || (typeof v === "string" && v.trim() !== "" && isFinite(Number(v.replace(/,/g, ""))));
+      }) && rows.some(function(r) { return r[c] !== null && r[c] !== undefined && r[c] !== ""; });
+      numericCol[c] = allNumeric;
+      if (allNumeric) {
+        var maxDec = 0;
+        rows.forEach(function(r) {
+          var v = r[c];
+          if (v === null || v === undefined || v === "") return;
+          var dot = String(v).indexOf(".");
+          if (dot !== -1) maxDec = Math.max(maxDec, String(v).length - dot - 1);
+        });
+        colDecimals[c] = maxDec;
+      }
+    });
+
+    var thead = document.getElementById("bcn-thead");
+    var hr = document.createElement("tr");
+    cols.forEach(function(c) {
+      var th = document.createElement("th");
+      th.textContent = c;
+      if (numericCol[c]) th.style.textAlign = "right";
+      hr.appendChild(th);
+    });
+    thead.appendChild(hr);
+
+    var tbody = document.getElementById("bcn-tbody");
+    rows.forEach(function(row) {
+      var tr = document.createElement("tr");
+      cols.forEach(function(c) {
+        var td = document.createElement("td");
+        var v = row[c];
+        if (numericCol[c] && v !== null && v !== undefined && v !== "") {
+          var n = typeof v === "number" ? v : parseFloat(String(v).replace(/,/g, ""));
+          td.textContent = isNaN(n) ? String(v) : n.toFixed(colDecimals[c]);
+          td.style.textAlign = "right";
+          td.style.fontVariantNumeric = "tabular-nums";
+        } else {
+          td.textContent = (v === null || v === undefined) ? "" : String(v);
+        }
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+  }
+
+  function check() {
+    try {
+      var output = window.openai && window.openai.toolOutput;
+      if (!output) { setTimeout(check, 50); return; }
+      render(output);
+    } catch(e) {
+      document.body.innerHTML = "<pre style='color:var(--bcn-error);padding:12px'>" + String(e.stack || e) + "</pre>";
+    }
+  }
+  check();
+</script>
+</body>
+</html>

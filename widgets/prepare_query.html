@@ -1,0 +1,94 @@
+<!doctype html>
+<html>
+<body class="bcn-body">
+
+<div id="bcn-wrap" class="bcn-wrap">
+  <div class="bcn-header">
+    <span id="bcn-qname" class="bcn-qname"></span>
+    <span id="bcn-qlabel" class="bcn-qlabel"></span>
+  </div>
+</div>
+
+<style>
+  :root {
+    --bcn-bg: #FFFFFF;
+    --bcn-surface: #F9FAFB;
+    --bcn-border: #E5E7EB;
+    --bcn-text-primary: #111827;
+    --bcn-text-body: #374151;
+    --bcn-gradient: linear-gradient(to right, #4A9FFF, #7C3AED);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bcn-bg: #111827;
+      --bcn-surface: #1F2937;
+      --bcn-border: #374151;
+      --bcn-text-primary: #F9FAFB;
+      --bcn-text-body: #E5E7EB;
+    }
+  }
+  .bcn-body { margin:0; padding:0; background:var(--bcn-bg); display:inline-block; }
+  .bcn-wrap {
+    border-radius:12px;
+    background:var(--bcn-bg);
+    color:var(--bcn-text-body);
+    font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    border:1px solid var(--bcn-border);
+    overflow:clip;
+    min-width:280px;
+    max-width:640px;
+  }
+  .bcn-wrap::before {
+    content:'';
+    display:block;
+    height:3px;
+    background:var(--bcn-gradient);
+  }
+  .bcn-header {
+    padding:12px 20px;
+    background:var(--bcn-surface);
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .bcn-qname {
+    font-size:11px;
+    font-weight:600;
+    font-family:ui-monospace,SFMono-Regular,Consolas,monospace;
+    color:#4A9FFF;
+    background:rgba(74,159,255,.08);
+    border:1px solid rgba(74,159,255,.25);
+    border-radius:4px;
+    padding:2px 8px;
+    letter-spacing:.04em;
+    white-space:nowrap;
+  }
+  .bcn-qlabel {
+    font-size:13px;
+    font-weight:600;
+    color:var(--bcn-text-primary);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+</style>
+
+<script>
+  function render(output) {
+    document.getElementById("bcn-qname").textContent = output.query_name || "";
+    document.getElementById("bcn-qlabel").textContent = output.query_label || "";
+  }
+
+  function check() {
+    try {
+      var output = window.openai && window.openai.toolOutput;
+      if (!output) { setTimeout(check, 50); return; }
+      render(output);
+    } catch(e) {
+      document.body.innerHTML = "<pre style='color:#DC2626;padding:12px'>" + String(e.stack || e) + "</pre>";
+    }
+  }
+  check();
+</script>
+</body>
+</html>
