@@ -3,6 +3,7 @@ from pathlib import Path
 
 import mcp.types as types
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 
 WIDGETS_DIR = Path(__file__).parent / "widgets"
 
@@ -112,7 +113,11 @@ MOCK_HIERARCHY_DIRECTORY = [
 ]
 
 
-mcp = FastMCP("beacon-widget-test", stateless_http=True)
+mcp = FastMCP(
+    "beacon-widget-test",
+    stateless_http=True,
+    transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
+)
 
 
 @mcp.resource(PREPARE_QUERY_URI, mime_type="text/html+skybridge")
