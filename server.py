@@ -356,6 +356,15 @@ mcp = FastMCP(
     transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
 )
 
+# Declare MCP Apps extension capability so hosts (Claude.ai) enable full MCP Apps support.
+_orig_get_caps = mcp._mcp_server.get_capabilities
+def _get_caps_with_ui_ext(notification_options: object, experimental_capabilities: dict) -> object:
+    return _orig_get_caps(notification_options, {
+        "io.modelcontextprotocol/ui": {"mimeTypes": [MCP_APP_MIME_TYPE]},
+        **(experimental_capabilities or {}),
+    })
+mcp._mcp_server.get_capabilities = _get_caps_with_ui_ext
+
 
 @mcp.resource(PREPARE_QUERY_URI, mime_type="text/html+skybridge")
 def prepare_query_template() -> str:

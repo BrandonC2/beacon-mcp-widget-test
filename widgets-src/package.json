@@ -3,13 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "node build.mjs"
+    "build": "bun build.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/ext-apps": "latest"
-  },
-  "devDependencies": {
-    "vite": "^6.0.0",
-    "vite-plugin-singlefile": "^2.0.0"
   }
 }
