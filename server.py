@@ -1,9 +1,17 @@
 import json
+import secrets
+import time
+import urllib.parse
 from pathlib import Path
 
 import mcp.types as types
+import uvicorn
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
+from starlette.requests import Request
+from starlette.responses import JSONResponse, RedirectResponse, Response
+from starlette.routing import Route
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 WIDGETS_DIR = Path(__file__).parent / "widgets"
 
@@ -12,6 +20,14 @@ QUERY_EXECUTED_URI = "ui://widget/query_executed"
 FIELD_VALUES_URI = "ui://widget/field_values"
 SIMILAR_TEXT_URI = "ui://widget/similar_text"
 HIERARCHY_URI = "ui://widget/hierarchy"
+
+PREPARE_QUERY_APP_URI = "ui://app/prepare_query"
+QUERY_EXECUTED_APP_URI = "ui://app/query_executed"
+FIELD_VALUES_APP_URI = "ui://app/field_values"
+SIMILAR_TEXT_APP_URI = "ui://app/similar_text"
+HIERARCHY_APP_URI = "ui://app/hierarchy"
+
+MCP_APP_MIME_TYPE = "text/html;profile=mcp-app"
 
 MOCK_QUERIES: dict[str, str] = {
     "ZSNAP_F01S_Q01": "Open Accounts Payable",
@@ -30,25 +46,25 @@ MOCK_AP_RESULT = [
 ]
 
 MOCK_VENDOR_RESULT = [
-    {"Vendor ID": "V001", "Vendor Name": "ACME Corporation",   "Country": "US", "Payment Terms": "NET30"},
-    {"Vendor ID": "V002", "Vendor Name": "Global Supplies Ltd","Country": "UK", "Payment Terms": "NET60"},
-    {"Vendor ID": "V003", "Vendor Name": "Tech Parts Inc.",    "Country": "DE", "Payment Terms": "NET30"},
-    {"Vendor ID": "V004", "Vendor Name": "Premium Services",   "Country": "FR", "Payment Terms": "NET45"},
+    {"Vendor ID": "V001", "Vendor Name": "ACME Corporation",    "Country": "US", "Payment Terms": "NET30"},
+    {"Vendor ID": "V002", "Vendor Name": "Global Supplies Ltd", "Country": "UK", "Payment Terms": "NET60"},
+    {"Vendor ID": "V003", "Vendor Name": "Tech Parts Inc.",     "Country": "DE", "Payment Terms": "NET30"},
+    {"Vendor ID": "V004", "Vendor Name": "Premium Services",    "Country": "FR", "Payment Terms": "NET45"},
 ]
 
 MOCK_DATASETS: dict[str, list[dict[str, object]]] = {
     "ZSNAP_F01S_Q01": MOCK_AP_RESULT,
     "ZSNAP_F02S_Q01": MOCK_VENDOR_RESULT,
     "ZSNAP_GL01_Q01": [
-        {"GL Account": "100000", "GL Account Name": "Cash",                     "Balance": 250000.00},
-        {"GL Account": "110000", "GL Account Name": "Accounts Receivable",      "Balance": 182450.75},
-        {"GL Account": "200000", "GL Account Name": "Accounts Payable",         "Balance": -94300.00},
-        {"GL Account": "300000", "GL Account Name": "Common Stock",             "Balance": -500000.00},
+        {"GL Account": "100000", "GL Account Name": "Cash",               "Balance": 250000.00},
+        {"GL Account": "110000", "GL Account Name": "Accounts Receivable", "Balance": 182450.75},
+        {"GL Account": "200000", "GL Account Name": "Accounts Payable",    "Balance": -94300.00},
+        {"GL Account": "300000", "GL Account Name": "Common Stock",        "Balance": -500000.00},
     ],
     "ZSNAP_MM01_Q01": [
-        {"PO Number": "4500000001", "Vendor": "ACME Corporation",  "Net Value": 12000.00, "Status": "Open"},
-        {"PO Number": "4500000002", "Vendor": "Global Supplies",   "Net Value": 5400.00,  "Status": "Closed"},
-        {"PO Number": "4500000003", "Vendor": "Tech Parts Inc.",   "Net Value": 88000.00, "Status": "Open"},
+        {"PO Number": "4500000001", "Vendor": "ACME Corporation", "Net Value": 12000.00, "Status": "Open"},
+        {"PO Number": "4500000002", "Vendor": "Global Supplies",  "Net Value": 5400.00,  "Status": "Closed"},
+        {"PO Number": "4500000003", "Vendor": "Tech Parts Inc.",  "Net Value": 88000.00, "Status": "Open"},
     ],
 }
 
@@ -66,7 +82,7 @@ MOCK_SIMILAR_SUPPLIERS = [
     {"Supplier ID": "ACME003", "Supplier Name": "ACME Global Inc."},
 ]
 
-MOCK_HIERARCHY_TREE = {
+MOCK_HIERARCHY_TREE: dict[str, object] = {
     "name": "Media Demo FSV (US GAAP)",
     "id": "0ZMED",
     "children": [
@@ -90,7 +106,7 @@ MOCK_HIERARCHY_TREE = {
             "name": "LIABILITIES",
             "id": "00LIAB",
             "children": [
-                {"name": "Accounts Payable",  "id": "021"},
+                {"name": "Accounts Payable",   "id": "021"},
                 {"name": "Loans (short term)", "id": "038"},
                 {"name": "Other",              "id": "039"},
             ],
@@ -107,9 +123,9 @@ MOCK_HIERARCHY_TREE = {
 }
 
 MOCK_HIERARCHY_DIRECTORY = [
-    {"name": "Media Demo FSV (US GAAP)", "id": "ZMED",  "is_default": True},
-    {"name": "Cost Center Hierarchy",    "id": "ZCC",   "is_default": False},
-    {"name": "Profit Center Hierarchy",  "id": "ZPC",   "is_default": False},
+    {"name": "Media Demo FSV (US GAAP)", "id": "ZMED", "is_default": True},
+    {"name": "Cost Center Hierarchy",    "id": "ZCC",  "is_default": False},
+    {"name": "Profit Center Hierarchy",  "id": "ZPC",  "is_default": False},
 ]
 
 MOCK_RECIPES: dict[str, dict[str, object]] = {
@@ -152,7 +168,6 @@ MOCK_RECIPES: dict[str, dict[str, object]] = {
         "filters": [{"field": "Status", "operator": "Equals", "value": "Open", "attribute": ""}],
     },
 }
-
 
 MOCK_SCHEMAS: dict[str, str] = {
     "ZSNAP_F01S_Q01": """\
@@ -222,6 +237,126 @@ measures:
 }
 
 
+WIDGET_TEMPLATES: dict[str, str] = {
+    name: (WIDGETS_DIR / f"{name}.html").read_text(encoding="utf-8")
+    for name in ("prepare_query", "query_executed", "field_values", "similar_text", "hierarchy")
+}
+
+
+def render_widget(name: str, data: dict[str, object]) -> str:
+    # Inline data into check() so Claude.ai can artifact the HTML with data already present.
+    return WIDGET_TEMPLATES[name].replace(
+        "var output = window.openai && window.openai.toolOutput;",
+        f"var output = (window.openai && window.openai.toolOutput) || {json.dumps(data)};",
+    )
+
+
+# Normalizes /mcp/ to /mcp — some MCP clients and ngrok send a trailing slash variant.
+class NormalizeSlashMiddleware:
+    def __init__(self, app: ASGIApp, path: str = "/mcp") -> None:
+        self.app = app
+        self.path = path.rstrip("/")
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] == "http" and scope["path"].rstrip("/") == self.path:
+            scope["path"] = self.path
+        await self.app(scope, receive, send)
+
+
+# ngrok terminates TLS and forwards HTTP; read x-forwarded-proto to build correct self-referencing URLs.
+def _base_url(request: Request) -> str:
+    proto = request.headers.get("x-forwarded-proto") or request.url.scheme
+    host = request.headers.get("host") or request.url.netloc
+    return f"{proto}://{host}"
+
+
+async def health(_request: Request) -> JSONResponse:
+    return JSONResponse({"status": "healthy", "server": "beacon-widget-test"})
+
+
+async def widget_js(_request: Request) -> Response:
+    js = """
+document.getElementById("log").textContent += "\\nexternal script loaded";
+window.addEventListener("message", function(e) {
+    document.getElementById("log").textContent += "\\n--- msg ---\\n" + JSON.stringify(e.data).slice(0, 600);
+});
+document.getElementById("log").textContent += "\\nwindow.openai=" + JSON.stringify(window.openai);
+"""
+    return Response(content=js, media_type="application/javascript")
+
+
+# OAuth 2.0 endpoints — Claude.ai requires RFC 8414 server discovery + RFC 7591 dynamic
+# client registration + PKCE authorization_code flow before it will connect to any remote
+# MCP server.  These handlers complete that handshake without enforcing real auth; the
+# MCP tools themselves are unprotected.  ChatGPT does not require this flow.
+
+async def oauth_protected_resource(request: Request) -> JSONResponse:
+    base = _base_url(request)
+    return JSONResponse({
+        "resource": f"{base}/mcp",
+        "authorization_servers": [base],
+        "bearer_methods_supported": ["header"],
+    })
+
+
+async def oauth_authorization_server(request: Request) -> JSONResponse:
+    base = _base_url(request)
+    return JSONResponse({
+        "issuer": base,
+        "authorization_endpoint": f"{base}/authorize",
+        "token_endpoint": f"{base}/token",
+        "registration_endpoint": f"{base}/register",
+        "response_types_supported": ["code"],
+        "grant_types_supported": ["authorization_code"],
+        "code_challenge_methods_supported": ["S256"],
+        "token_endpoint_auth_methods_supported": ["none"],
+        "scopes_supported": [],
+    })
+
+
+async def register(request: Request) -> JSONResponse:
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    redirect_uris: list[str] = body.get("redirect_uris", []) if isinstance(body, dict) else []
+    return JSONResponse(
+        {
+            "client_id": "beacon-widget-test",
+            "client_id_issued_at": int(time.time()),
+            "client_secret_expires_at": 0,
+            "redirect_uris": redirect_uris,
+            "grant_types": ["authorization_code"],
+            "response_types": ["code"],
+            "token_endpoint_auth_method": "none",
+        },
+        status_code=201,
+    )
+
+
+async def authorize(request: Request) -> Response:
+    params = dict(request.query_params)
+    redirect_uri = params.get("redirect_uri", "")
+    state = params.get("state", "")
+    code = secrets.token_urlsafe(16)
+    callback_params: dict[str, str] = {"code": code}
+    if state:
+        callback_params["state"] = state
+    sep = "&" if "?" in redirect_uri else "?"
+    return RedirectResponse(
+        url=f"{redirect_uri}{sep}{urllib.parse.urlencode(callback_params)}",
+        status_code=302,
+    )
+
+
+async def token(_request: Request) -> JSONResponse:
+    return JSONResponse({
+        "access_token": secrets.token_urlsafe(32),
+        "token_type": "bearer",
+        "expires_in": 3600,
+    })
+
+
 mcp = FastMCP(
     "beacon-widget-test",
     stateless_http=True,
@@ -231,27 +366,52 @@ mcp = FastMCP(
 
 @mcp.resource(PREPARE_QUERY_URI, mime_type="text/html+skybridge")
 def prepare_query_template() -> str:
-    return (WIDGETS_DIR / "prepare_query.html").read_text(encoding="utf-8")
+    return WIDGET_TEMPLATES["prepare_query"]
 
 
 @mcp.resource(QUERY_EXECUTED_URI, mime_type="text/html+skybridge")
 def query_executed_template() -> str:
-    return (WIDGETS_DIR / "query_executed.html").read_text(encoding="utf-8")
+    return WIDGET_TEMPLATES["query_executed"]
 
 
 @mcp.resource(FIELD_VALUES_URI, mime_type="text/html+skybridge")
 def field_values_template() -> str:
-    return (WIDGETS_DIR / "field_values.html").read_text(encoding="utf-8")
+    return WIDGET_TEMPLATES["field_values"]
 
 
 @mcp.resource(SIMILAR_TEXT_URI, mime_type="text/html+skybridge")
 def similar_text_template() -> str:
-    return (WIDGETS_DIR / "similar_text.html").read_text(encoding="utf-8")
+    return WIDGET_TEMPLATES["similar_text"]
 
 
 @mcp.resource(HIERARCHY_URI, mime_type="text/html+skybridge")
 def hierarchy_template() -> str:
-    return (WIDGETS_DIR / "hierarchy.html").read_text(encoding="utf-8")
+    return WIDGET_TEMPLATES["hierarchy"]
+
+
+@mcp.resource(PREPARE_QUERY_APP_URI, mime_type=MCP_APP_MIME_TYPE)
+def prepare_query_app_template() -> str:
+    return WIDGET_TEMPLATES["prepare_query"]
+
+
+@mcp.resource(QUERY_EXECUTED_APP_URI, mime_type=MCP_APP_MIME_TYPE)
+def query_executed_app_template() -> str:
+    return WIDGET_TEMPLATES["query_executed"]
+
+
+@mcp.resource(FIELD_VALUES_APP_URI, mime_type=MCP_APP_MIME_TYPE)
+def field_values_app_template() -> str:
+    return WIDGET_TEMPLATES["field_values"]
+
+
+@mcp.resource(SIMILAR_TEXT_APP_URI, mime_type=MCP_APP_MIME_TYPE)
+def similar_text_app_template() -> str:
+    return WIDGET_TEMPLATES["similar_text"]
+
+
+@mcp.resource(HIERARCHY_APP_URI, mime_type=MCP_APP_MIME_TYPE)
+def hierarchy_app_template() -> str:
+    return WIDGET_TEMPLATES["hierarchy"]
 
 
 @mcp.tool(meta={
@@ -259,6 +419,7 @@ def hierarchy_template() -> str:
     "openai/toolInvocation/invoking": "Preparing query...",
     "openai/toolInvocation/invoked": "Done.",
     "openai/widgetAccessible": True,
+    "ui/resourceUri": PREPARE_QUERY_APP_URI,
 })
 def prepare_query(query_name: str) -> types.CallToolResult:
     """Prepare a Beacon query for execution. Available queries:
@@ -270,13 +431,10 @@ def prepare_query(query_name: str) -> types.CallToolResult:
     key = query_name.upper()
     label = MOCK_QUERIES.get(key, "Unknown Query")
     schema_yaml = MOCK_SCHEMAS.get(key, "")
+    data: dict[str, object] = {"query_name": key, "query_label": label, "schema_yaml": schema_yaml}
     return types.CallToolResult.model_validate({
-        "content": [{"type": "text", "text": f"Query {query_name} prepared. What would you like to analyze?"}],
-        "structuredContent": {
-            "query_name": key,
-            "query_label": label,
-            "schema_yaml": schema_yaml,
-        },
+        "content": [{"type": "text", "text": render_widget("prepare_query", data)}],
+        "structuredContent": data,
     })
 
 
@@ -285,20 +443,18 @@ def prepare_query(query_name: str) -> types.CallToolResult:
     "openai/toolInvocation/invoking": "Running query...",
     "openai/toolInvocation/invoked": "Done.",
     "openai/widgetAccessible": True,
+    "ui/resourceUri": QUERY_EXECUTED_APP_URI,
 })
 def data_preview(query_name: str, query_title: str) -> types.CallToolResult:
     """Execute a Beacon query and return results. query_name must be one of the available queries.
     query_title is a short human-readable description of what was asked.
     """
-    data = MOCK_DATASETS.get(query_name.upper(), MOCK_AP_RESULT)
+    rows = MOCK_DATASETS.get(query_name.upper(), MOCK_AP_RESULT)
     recipe = MOCK_RECIPES.get(query_name.upper(), {})
+    data: dict[str, object] = {"query_title": query_title, "result_json": json.dumps(rows), "recipe_json": json.dumps(recipe)}
     return types.CallToolResult.model_validate({
-        "content": [{"type": "text", "text": f"Results for {query_title}."}],
-        "structuredContent": {
-            "query_title": query_title,
-            "result_json": json.dumps(data),
-            "recipe_json": json.dumps(recipe),
-        },
+        "content": [{"type": "text", "text": render_widget("query_executed", data)}],
+        "structuredContent": data,
     })
 
 
@@ -307,17 +463,16 @@ def data_preview(query_name: str, query_title: str) -> types.CallToolResult:
     "openai/toolInvocation/invoking": "Previewing field values...",
     "openai/toolInvocation/invoked": "Done.",
     "openai/widgetAccessible": True,
+    "ui/resourceUri": FIELD_VALUES_APP_URI,
 })
 def preview_field_values(query_name: str, field_name: str) -> types.CallToolResult:
     """Preview the possible values for a field in a Beacon query.
     Example: query_name=ZSNAP_F01S_Q01, field_name=CompanyCode
     """
+    data: dict[str, object] = {"field_label": field_name, "table_json": json.dumps(MOCK_COMPANY_CODES)}
     return types.CallToolResult.model_validate({
-        "content": [{"type": "text", "text": f"Field values for {field_name}."}],
-        "structuredContent": {
-            "field_label": "Company Code",
-            "table_json": json.dumps(MOCK_COMPANY_CODES),
-        },
+        "content": [{"type": "text", "text": render_widget("field_values", data)}],
+        "structuredContent": {"field_label": "Company Code", "table_json": json.dumps(MOCK_COMPANY_CODES)},
     })
 
 
@@ -326,18 +481,16 @@ def preview_field_values(query_name: str, field_name: str) -> types.CallToolResu
     "openai/toolInvocation/invoking": "Searching...",
     "openai/toolInvocation/invoked": "Done.",
     "openai/widgetAccessible": True,
+    "ui/resourceUri": SIMILAR_TEXT_APP_URI,
 })
 def find_similar_text(query_name: str, search_field: str, text_lookup: str) -> types.CallToolResult:
     """Find records with text similar to text_lookup in a given field.
     Example: query_name=ZSNAP_F02S_Q01, search_field=VendorName, text_lookup=ACME
     """
+    data: dict[str, object] = {"field_label": search_field, "search_text": text_lookup, "table_json": json.dumps(MOCK_SIMILAR_SUPPLIERS)}
     return types.CallToolResult.model_validate({
-        "content": [{"type": "text", "text": f"Found matches for '{text_lookup}'."}],
-        "structuredContent": {
-            "field_label": "Supplier Name",
-            "search_text": text_lookup,
-            "table_json": json.dumps(MOCK_SIMILAR_SUPPLIERS),
-        },
+        "content": [{"type": "text", "text": render_widget("similar_text", data)}],
+        "structuredContent": {"field_label": "Supplier Name", "search_text": text_lookup, "table_json": json.dumps(MOCK_SIMILAR_SUPPLIERS)},
     })
 
 
@@ -346,6 +499,7 @@ def find_similar_text(query_name: str, search_field: str, text_lookup: str) -> t
     "openai/toolInvocation/invoking": "Exploring hierarchy...",
     "openai/toolInvocation/invoked": "Done.",
     "openai/widgetAccessible": True,
+    "ui/resourceUri": HIERARCHY_APP_URI,
 })
 def explore_hierarchy(query_name: str, field_name: str, mode: str = "directory", hierarchy: str = "ZMED") -> types.CallToolResult:
     """Explore a field hierarchy in a Beacon query.
@@ -353,24 +507,31 @@ def explore_hierarchy(query_name: str, field_name: str, mode: str = "directory",
     Example: query_name=ZSNAP_GL01_Q01, field_name=GLAccount, mode=tree, hierarchy=ZMED
     """
     if mode == "directory":
+        data: dict[str, object] = {"mode": "directory", "field_label": field_name, "data_json": json.dumps(MOCK_HIERARCHY_DIRECTORY)}
         return types.CallToolResult.model_validate({
-            "content": [{"type": "text", "text": f"Available hierarchies for {field_name}."}],
-            "structuredContent": {
-                "mode": "directory",
-                "field_label": "GL Account",
-                "data_json": json.dumps(MOCK_HIERARCHY_DIRECTORY),
-            },
+            "content": [{"type": "text", "text": render_widget("hierarchy", data)}],
+            "structuredContent": {"mode": "directory", "field_label": "GL Account", "data_json": json.dumps(MOCK_HIERARCHY_DIRECTORY)},
         })
+    data: dict[str, object] = {"mode": "tree", "field_label": field_name, "hierarchy_id": hierarchy, "data_json": json.dumps(MOCK_HIERARCHY_TREE)}
     return types.CallToolResult.model_validate({
-        "content": [{"type": "text", "text": f"Hierarchy {hierarchy} for {field_name}."}],
-        "structuredContent": {
-            "mode": "tree",
-            "field_label": "GL Account",
-            "hierarchy_id": hierarchy,
-            "data_json": json.dumps(MOCK_HIERARCHY_TREE),
-        },
+        "content": [{"type": "text", "text": render_widget("hierarchy", data)}],
+        "structuredContent": {"mode": "tree", "field_label": "GL Account", "hierarchy_id": hierarchy, "data_json": json.dumps(MOCK_HIERARCHY_TREE)},
     })
 
 
 if __name__ == "__main__":
-    mcp.run(transport="streamable-http")
+    app = mcp.streamable_http_app()
+
+    app.routes.insert(0, Route("/health", health))
+    app.routes.insert(0, Route("/widget.js", widget_js))
+    app.routes.insert(0, Route("/.well-known/oauth-protected-resource", oauth_protected_resource))
+    app.routes.insert(0, Route("/.well-known/oauth-protected-resource/{path:path}", oauth_protected_resource))
+    app.routes.insert(0, Route("/.well-known/oauth-authorization-server", oauth_authorization_server))
+    app.routes.insert(0, Route("/.well-known/openid-configuration", oauth_authorization_server))
+    app.routes.insert(0, Route("/authorize", authorize))
+    app.routes.insert(0, Route("/token", token, methods=["POST"]))
+    app.routes.insert(0, Route("/register", register, methods=["POST"]))
+
+    app.add_middleware(NormalizeSlashMiddleware)
+
+    uvicorn.run(app, host="0.0.0.0", port=8000)

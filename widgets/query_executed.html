@@ -6,9 +6,9 @@
   <div class="bcn-header">
     <span class="bcn-badge">EXECUTED</span>
     <span id="bcn-title" class="bcn-title"></span>
-    <button id="bcn-recipe-btn" class="bcn-recipe-btn" style="display:none;">Recipe ▾</button>
+    <button id="bcn-recipe-btn" class="bcn-recipe-btn" style="display:none;">Details</button>
   </div>
-  <div style="overflow-x:auto;overflow-y:auto;max-height:320px;">
+  <div id="bcn-table-wrap" style="overflow-x:auto;overflow-y:auto;max-height:320px;">
     <table id="bcn-table" class="bcn-table">
       <thead id="bcn-thead"></thead>
       <tbody id="bcn-tbody"></tbody>
@@ -34,6 +34,8 @@
     --bcn-row-hover: linear-gradient(to right, rgba(74,159,255,.04), rgba(124,58,237,.04));
     --bcn-blue: #4A9FFF;
     --bcn-error: #DC2626;
+    --bcn-chip-bg: #FFFFFF;
+    --bcn-chip-badge-bg: #F3F4F6;
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -50,9 +52,12 @@
       --bcn-row-hover: linear-gradient(to right, rgba(74,159,255,.07), rgba(124,58,237,.07));
       --bcn-blue: #4A9FFF;
       --bcn-error: #F87171;
+      --bcn-chip-bg: #1F2937;
+      --bcn-chip-badge-bg: #374151;
     }
   }
-  .bcn-body { margin:0; padding:0; background:var(--bcn-bg); display:inline-block; }
+  html, body { overflow:hidden; }
+  .bcn-body { margin:0; padding:0; background:var(--bcn-bg); display:block; }
   .bcn-wrap {
     border-radius:12px;
     background:var(--bcn-bg);
@@ -60,7 +65,7 @@
     font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     border:1px solid var(--bcn-border);
     overflow:clip;
-    min-width:320px;
+    width:100%;
     max-width:900px;
   }
   .bcn-wrap::before {
@@ -70,8 +75,8 @@
     background:var(--bcn-gradient);
   }
   .bcn-header {
-    padding:12px 20px;
-    background:var(--bcn-surface);
+    padding:16px 20px;
+    background:var(--bcn-bg);
     border-bottom:1px solid var(--bcn-border);
     display:flex;
     align-items:center;
@@ -88,36 +93,36 @@
     -webkit-background-clip:text;
     -webkit-text-fill-color:transparent;
     background-clip:text;
+    white-space:nowrap;
   }
-  .bcn-title { font-size:13px; font-weight:600; color:var(--bcn-text-primary); flex:1; }
+  .bcn-title { font-size:14px; font-weight:600; color:var(--bcn-text-primary); flex:1; }
   .bcn-recipe-btn {
-    font-size:11px;
-    font-weight:600;
+    font-size:13px;
+    font-weight:500;
     color:var(--bcn-text-muted);
-    background:none;
+    background:var(--bcn-bg);
     border:1px solid var(--bcn-border);
-    border-radius:4px;
-    padding:3px 9px;
+    border-radius:8px;
+    padding:6px 14px;
     cursor:pointer;
-    transition:all 0.15s ease;
+    transition:all 0.2s ease;
     white-space:nowrap;
     font-family:inherit;
   }
-  .bcn-recipe-btn:hover { color:var(--bcn-blue); border-color:var(--bcn-blue); }
-  .bcn-table { width:100%; border-collapse:collapse; font-size:12px; }
+  .bcn-recipe-btn:hover { background:var(--bcn-surface); border-color:#D1D5DB; }
+  .bcn-recipe-btn:active { background:var(--bcn-divider); }
+  .bcn-table { width:100%; border-collapse:collapse; font-size:13px; }
   .bcn-table th {
-    padding:8px 12px;
+    padding:10px 12px;
     text-align:left;
-    font-size:11px;
+    font-size:12px;
     font-weight:600;
     color:var(--bcn-text-muted);
     border-bottom:1px solid var(--bcn-border);
     white-space:nowrap;
-    letter-spacing:.04em;
-    text-transform:uppercase;
     position:sticky;
     top:0;
-    background:var(--bcn-surface);
+    background:var(--bcn-bg);
     z-index:1;
     cursor:pointer;
     user-select:none;
@@ -125,56 +130,52 @@
   }
   .bcn-table th:hover { color:var(--bcn-text-body); }
   .bcn-table th.bcn-sort-active { color:var(--bcn-blue); }
-  .bcn-sort-icon { font-size:9px; margin-left:3px; opacity:0.5; }
+  .bcn-sort-icon { font-size:9px; margin-left:4px; opacity:0.5; }
   .bcn-sort-active .bcn-sort-icon { opacity:1; }
   .bcn-table td {
-    padding:7px 12px;
+    padding:9px 12px;
     border-bottom:1px solid var(--bcn-divider);
     color:var(--bcn-text-body);
     white-space:nowrap;
-    transition:all 0.15s ease;
   }
   .bcn-table tr:last-child td { border-bottom:none; }
   .bcn-table tr:hover td { background:var(--bcn-row-hover); }
-  .bcn-empty { padding:14px 20px; color:var(--bcn-text-muted); font-size:12px; }
+  .bcn-empty { padding:20px; color:var(--bcn-text-subtle); font-size:13px; text-align:center; }
   .bcn-recipe {
     border-top:1px solid var(--bcn-border);
     background:var(--bcn-surface);
-    padding:14px 20px;
-    overflow-x:auto;
+    padding:16px 20px;
+    display:flex;
+    flex-direction:column;
+    gap:12px;
   }
-  .bcn-recipe-section { margin-bottom:14px; }
-  .bcn-recipe-section:last-child { margin-bottom:0; }
-  .bcn-recipe-heading {
-    font-size:10px;
-    font-weight:700;
-    letter-spacing:.06em;
-    text-transform:uppercase;
-    color:var(--bcn-text-muted);
-    margin-bottom:6px;
+  .bcn-recipe-section {
+    border:1px solid var(--bcn-border);
+    border-radius:12px;
+    overflow:hidden;
+    background:var(--bcn-bg);
   }
-  .bcn-recipe-table { width:100%; border-collapse:collapse; font-size:11px; }
-  .bcn-recipe-table th {
-    padding:4px 8px;
-    text-align:left;
-    font-size:10px;
+  .bcn-recipe-label {
+    font-size:13px;
     font-weight:600;
-    color:var(--bcn-text-subtle);
-    letter-spacing:.04em;
-    text-transform:uppercase;
+    color:var(--bcn-text-primary);
+    padding:12px 16px;
     border-bottom:1px solid var(--bcn-border);
-    white-space:nowrap;
-    cursor:default;
-    user-select:none;
   }
-  .bcn-recipe-table td {
-    padding:4px 8px;
+  .bcn-recipe-items { padding:12px 16px; display:flex; flex-wrap:wrap; gap:8px; }
+  .bcn-recipe-item {
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:0 12px;
+    height:32px;
+    background:var(--bcn-surface);
+    border:1px solid var(--bcn-border);
+    border-radius:6px;
+    font-size:13px;
     color:var(--bcn-text-body);
-    border-bottom:1px solid var(--bcn-divider);
-    white-space:nowrap;
   }
-  .bcn-recipe-table tr:last-child td { border-bottom:none; }
-  .bcn-recipe-limit { font-size:12px; color:var(--bcn-text-body); }
+  .bcn-recipe-item-dir { color:var(--bcn-blue); font-size:10px; }
   ::-webkit-scrollbar { width:6px; height:6px; }
   ::-webkit-scrollbar-track { background:var(--bcn-surface); }
   ::-webkit-scrollbar-thumb { background:var(--bcn-scrollbar); border-radius:3px; }
@@ -190,13 +191,24 @@
   var _sortCol = null;
   var _sortAsc = true;
   var _recipeOpen = false;
-  var _recipeSortsTbody = null;
+  var _recipeSortsEl = null;
   var _originalSorts = [];
+
+  function operatorAbbrev(op) {
+    var map = {
+      "Equals": "=", "Not Equals": "≠",
+      "Greater Than": ">", "Less Than": "<",
+      "Greater Than or Equal": "≥", "Less Than or Equal": "≤",
+      "Contains": "~", "Not Contains": "!~",
+      "In List": "∈", "Not In List": "∉",
+      "Between": "↔"
+    };
+    return map[op] || (op ? op.substring(0, 2) : "?");
+  }
 
   function sortedRows() {
     if (_sortCol === null) return _rows;
-    var col = _sortCol;
-    var asc = _sortAsc;
+    var col = _sortCol, asc = _sortAsc;
     return _rows.slice().sort(function(a, b) {
       var av = a[col], bv = b[col];
       if (_numericCol[col]) {
@@ -232,30 +244,33 @@
     });
   }
 
+  function makeItem(text, dir) {
+    var item = document.createElement("div");
+    item.className = "bcn-recipe-item";
+    if (dir) {
+      var d = document.createElement("span");
+      d.className = "bcn-recipe-item-dir";
+      d.textContent = dir;
+      item.appendChild(d);
+    }
+    item.appendChild(document.createTextNode(text));
+    return item;
+  }
+
   function syncRecipeSorts() {
-    if (!_recipeSortsTbody) return;
-    _recipeSortsTbody.innerHTML = "";
+    if (!_recipeSortsEl) return;
+    _recipeSortsEl.innerHTML = "";
     var sorts = _sortCol !== null
       ? [{ field: _sortCol, direction: _sortAsc ? "Ascending" : "Descending" }]
       : _originalSorts;
     if (sorts.length === 0) {
-      var tr = document.createElement("tr");
-      var td = document.createElement("td");
-      td.colSpan = 2;
-      td.textContent = "—";
-      td.style.color = "var(--bcn-text-subtle)";
-      tr.appendChild(td);
-      _recipeSortsTbody.appendChild(tr);
+      var none = makeItem("none");
+      none.style.color = "var(--bcn-text-subtle)";
+      _recipeSortsEl.appendChild(none);
       return;
     }
     sorts.forEach(function(s) {
-      var tr = document.createElement("tr");
-      [s.field, s.direction].forEach(function(cell) {
-        var td = document.createElement("td");
-        td.textContent = cell || "—";
-        tr.appendChild(td);
-      });
-      _recipeSortsTbody.appendChild(tr);
+      _recipeSortsEl.appendChild(makeItem(s.field, s.direction === "Ascending" ? "▲" : "▼"));
     });
   }
 
@@ -272,99 +287,81 @@
 
   function toggleRecipe() {
     _recipeOpen = !_recipeOpen;
-    document.getElementById("bcn-recipe").style.display = _recipeOpen ? "" : "none";
-    document.getElementById("bcn-recipe-btn").textContent = _recipeOpen ? "Recipe ▴" : "Recipe ▾";
+    var wrap = document.getElementById("bcn-wrap");
+    var tableWrap = document.getElementById("bcn-table-wrap");
+    var recipe = document.getElementById("bcn-recipe");
+    var btn = document.getElementById("bcn-recipe-btn");
+    btn.textContent = _recipeOpen ? "Results" : "Details";
+    wrap.style.minHeight = wrap.offsetHeight + "px";
+    (_recipeOpen ? tableWrap : recipe).style.display = "none";
+    (_recipeOpen ? recipe : tableWrap).style.display = "";
+    requestAnimationFrame(function() {
+      requestAnimationFrame(function() {
+        wrap.style.minHeight = "";
+      });
+    });
   }
 
-  function renderRecipeSection(container, title, headers, rows) {
+  function renderRecipeSection(container, label, texts) {
     var section = document.createElement("div");
     section.className = "bcn-recipe-section";
-    var heading = document.createElement("div");
-    heading.className = "bcn-recipe-heading";
-    heading.textContent = title;
-    section.appendChild(heading);
-    var table = document.createElement("table");
-    table.className = "bcn-recipe-table";
-    var thead = document.createElement("thead");
-    var hr = document.createElement("tr");
-    headers.forEach(function(h) {
-      var th = document.createElement("th");
-      th.textContent = h;
-      hr.appendChild(th);
-    });
-    thead.appendChild(hr);
-    table.appendChild(thead);
-    var tbody = document.createElement("tbody");
-    rows.forEach(function(rowData) {
-      var tr = document.createElement("tr");
-      rowData.forEach(function(cell) {
-        var td = document.createElement("td");
-        td.textContent = (cell !== null && cell !== undefined && String(cell) !== "") ? String(cell) : "—";
-        tr.appendChild(td);
-      });
-      tbody.appendChild(tr);
-    });
-    table.appendChild(tbody);
-    section.appendChild(table);
+    var lbl = document.createElement("div");
+    lbl.className = "bcn-recipe-label";
+    lbl.textContent = label;
+    section.appendChild(lbl);
+    var items = document.createElement("div");
+    items.className = "bcn-recipe-items";
+    texts.forEach(function(t) { items.appendChild(makeItem(t.text, t.dir || null)); });
+    section.appendChild(items);
     container.appendChild(section);
   }
 
   function renderRecipe(recipe, container) {
     if (recipe.parameters && recipe.parameters.length > 0) {
-      renderRecipeSection(container, "Parameters", ["Parameter", "Value"],
-        recipe.parameters.map(function(p) { return [p.name, p.value]; }));
+      renderRecipeSection(container, "Parameters",
+        recipe.parameters.map(function(p) { return { text: p.name + ": " + p.value }; }));
     }
     if (recipe.rows && recipe.rows.length > 0) {
-      renderRecipeSection(container, "Rows", ["Field", "Attributes"],
-        recipe.rows.map(function(r) {
-          return [r.field, r.attributes && r.attributes.length > 0 ? r.attributes.join(", ") : "—"];
-        }));
+      renderRecipeSection(container, "Rows",
+        recipe.rows.map(function(r) { return { text: r.field }; }));
     }
     if (recipe.columns && recipe.columns.length > 0) {
-      renderRecipeSection(container, "Columns", ["Field", "Type", "Attributes"],
-        recipe.columns.map(function(c) {
-          if (c.type === "measure") return [c.field, "Measure", "—"];
-          return [c.field, "Dimension", c.attributes && c.attributes.length > 0 ? c.attributes.join(", ") : "—"];
-        }));
+      renderRecipeSection(container, "Columns",
+        recipe.columns.map(function(c) { return { text: c.field }; }));
     }
     if (recipe.filters && recipe.filters.length > 0) {
-      renderRecipeSection(container, "Filters", ["Field", "Attribute", "Operator", "Value"],
-        recipe.filters.map(function(f) { return [f.field, f.attribute || "—", f.operator, f.value]; }));
+      renderRecipeSection(container, "Filters",
+        recipe.filters.map(function(f) {
+          return { text: f.field + " " + operatorAbbrev(f.operator) + " " + f.value };
+        }));
     }
-    _originalSorts = (recipe.sorts || []).map(function(s) { return { field: s.field, direction: s.direction }; });
+
+    _originalSorts = (recipe.sorts || []).map(function(s) {
+      return { field: s.field, direction: s.direction };
+    });
     var sortsSection = document.createElement("div");
     sortsSection.className = "bcn-recipe-section";
-    var sortsHeading = document.createElement("div");
-    sortsHeading.className = "bcn-recipe-heading";
-    sortsHeading.textContent = "Sorts";
-    sortsSection.appendChild(sortsHeading);
-    var sortsTable = document.createElement("table");
-    sortsTable.className = "bcn-recipe-table";
-    var sortsThead = document.createElement("thead");
-    var sortsTr = document.createElement("tr");
-    ["Field", "Direction"].forEach(function(h) {
-      var th = document.createElement("th");
-      th.textContent = h;
-      sortsTr.appendChild(th);
-    });
-    sortsThead.appendChild(sortsTr);
-    sortsTable.appendChild(sortsThead);
-    _recipeSortsTbody = document.createElement("tbody");
-    sortsTable.appendChild(_recipeSortsTbody);
-    sortsSection.appendChild(sortsTable);
+    var sortsLbl = document.createElement("div");
+    sortsLbl.className = "bcn-recipe-label";
+    sortsLbl.textContent = "Sorted";
+    sortsSection.appendChild(sortsLbl);
+    _recipeSortsEl = document.createElement("div");
+    _recipeSortsEl.className = "bcn-recipe-items";
+    sortsSection.appendChild(_recipeSortsEl);
     container.appendChild(sortsSection);
     syncRecipeSorts();
+
     if (recipe.limit != null) {
       var section = document.createElement("div");
       section.className = "bcn-recipe-section";
-      var heading = document.createElement("div");
-      heading.className = "bcn-recipe-heading";
-      heading.textContent = "Limit";
-      var value = document.createElement("div");
-      value.className = "bcn-recipe-limit";
-      value.textContent = recipe.limit.toLocaleString() + " rows";
-      section.appendChild(heading);
-      section.appendChild(value);
+      var lbl = document.createElement("div");
+      lbl.className = "bcn-recipe-label";
+      lbl.textContent = "Limit";
+      var items = document.createElement("div");
+      items.className = "bcn-recipe-items";
+      items.appendChild(makeItem(recipe.limit.toLocaleString() + " rows"));
+      section.appendChild(lbl);
+      section.appendChild(items);
       container.appendChild(section);
     }
   }
@@ -387,10 +384,21 @@
         : output.result_json;
     } catch(e) { _rows = []; }
 
+    if (recipe && recipe.sorts && recipe.sorts.length > 0) {
+      _sortCol = recipe.sorts[0].field;
+      _sortAsc = recipe.sorts[0].direction !== "Descending";
+    }
+
     if (!_rows || _rows.length === 0) {
       document.getElementById("bcn-empty").style.display = "block";
     } else {
       _cols = Object.keys(_rows[0]);
+
+      // resolve _sortCol to actual column name (recipe field may lack currency suffix etc.)
+      if (_sortCol !== null && _cols.indexOf(_sortCol) === -1) {
+        var matched = _cols.find(function(c) { return c.indexOf(_sortCol) === 0 || _sortCol.indexOf(c) === 0; });
+        if (matched) _sortCol = matched;
+      }
       _cols.forEach(function(c) {
         var allNumeric = _rows.every(function(r) {
           var v = r[c];
@@ -435,6 +443,7 @@
         hr.appendChild(th);
       });
       thead.appendChild(hr);
+      updateSortHeaders();
       renderTbody();
     }
 

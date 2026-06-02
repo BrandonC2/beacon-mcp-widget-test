@@ -6,38 +6,24 @@
   <div class="bcn-header">
     <span id="bcn-qname" class="bcn-qname"></span>
     <span id="bcn-qlabel" class="bcn-qlabel"></span>
-    <button id="bcn-schema-btn" class="bcn-schema-btn" style="display:none;">Schema ▾</button>
-  </div>
-  <div id="bcn-schema" class="bcn-schema" style="display:none;">
-    <pre id="bcn-schema-content" class="bcn-schema-content"></pre>
   </div>
 </div>
 
 <style>
   :root {
     --bcn-bg: #FFFFFF;
-    --bcn-surface: #F9FAFB;
     --bcn-border: #E5E7EB;
     --bcn-text-primary: #111827;
     --bcn-text-body: #374151;
-    --bcn-text-muted: #6B7280;
-    --bcn-text-subtle: #9CA3AF;
     --bcn-gradient: linear-gradient(to right, #4A9FFF, #7C3AED);
     --bcn-blue: #4A9FFF;
-    --bcn-scrollbar: #D1D5DB;
-    --bcn-scrollbar-hover: #9CA3AF;
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --bcn-bg: #111827;
-      --bcn-surface: #1F2937;
       --bcn-border: #374151;
       --bcn-text-primary: #F9FAFB;
       --bcn-text-body: #E5E7EB;
-      --bcn-text-muted: #9CA3AF;
-      --bcn-text-subtle: #6B7280;
-      --bcn-scrollbar: #374151;
-      --bcn-scrollbar-hover: #4B5563;
     }
   }
   .bcn-body { margin:0; padding:0; background:var(--bcn-bg); display:inline-block; }
@@ -58,8 +44,8 @@
     background:var(--bcn-gradient);
   }
   .bcn-header {
-    padding:12px 20px;
-    background:var(--bcn-surface);
+    padding:16px 20px;
+    background:var(--bcn-bg);
     display:flex;
     align-items:center;
     gap:10px;
@@ -77,68 +63,20 @@
     white-space:nowrap;
   }
   .bcn-qlabel {
-    font-size:13px;
-    font-weight:600;
+    font-size:14px;
+    font-weight:500;
     color:var(--bcn-text-primary);
     flex:1;
     white-space:nowrap;
     overflow:hidden;
     text-overflow:ellipsis;
   }
-  .bcn-schema-btn {
-    font-size:11px;
-    font-weight:600;
-    color:var(--bcn-text-muted);
-    background:none;
-    border:1px solid var(--bcn-border);
-    border-radius:4px;
-    padding:3px 9px;
-    cursor:pointer;
-    transition:all 0.15s ease;
-    white-space:nowrap;
-    font-family:inherit;
-  }
-  .bcn-schema-btn:hover { color:var(--bcn-blue); border-color:var(--bcn-blue); }
-  .bcn-schema {
-    border-top:1px solid var(--bcn-border);
-    background:var(--bcn-surface);
-    padding:14px 20px;
-    overflow-x:auto;
-  }
-  .bcn-schema-content {
-    margin:0;
-    font-size:11px;
-    font-family:ui-monospace,SFMono-Regular,Consolas,monospace;
-    color:var(--bcn-text-body);
-    line-height:1.6;
-    white-space:pre;
-  }
-  ::-webkit-scrollbar { width:6px; height:6px; }
-  ::-webkit-scrollbar-track { background:var(--bcn-surface); }
-  ::-webkit-scrollbar-thumb { background:var(--bcn-scrollbar); border-radius:3px; }
-  ::-webkit-scrollbar-thumb:hover { background:var(--bcn-scrollbar-hover); }
 </style>
 
 <script>
-  var _schemaOpen = false;
-
-  function toggleSchema() {
-    _schemaOpen = !_schemaOpen;
-    document.getElementById("bcn-schema").style.display = _schemaOpen ? "" : "none";
-    document.getElementById("bcn-schema-btn").textContent = _schemaOpen ? "Schema ▴" : "Schema ▾";
-  }
-
   function render(output) {
     document.getElementById("bcn-qname").textContent = output.query_name || "";
     document.getElementById("bcn-qlabel").textContent = output.query_label || "";
-
-    var schema = output.schema_yaml || "";
-    if (schema) {
-      document.getElementById("bcn-schema-content").textContent = schema;
-      var btn = document.getElementById("bcn-schema-btn");
-      btn.style.display = "";
-      btn.onclick = toggleSchema;
-    }
   }
 
   function check() {
