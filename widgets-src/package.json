@@ -1,9 +1,9 @@
 {
   "name": "beacon-widgets",
   "private": true,
+  "type": "module",
   "scripts": {
-    "build": "vite build",
-    "dev": "vite build --watch"
+    "build": "node build.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/ext-apps": "latest"

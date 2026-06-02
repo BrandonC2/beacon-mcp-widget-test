@@ -1,0 +1,59 @@
+<!doctype html>
+<html style="overflow:hidden;">
+<body class="bcn-body">
+
+<div id="bcn-wrap" class="bcn-wrap">
+  <div class="bcn-header">
+    <span class="bcn-badge">HIERARCHY</span>
+    <span id="bcn-field" class="bcn-title"></span>
+  </div>
+  <div id="bcn-body" class="bcn-body-inner"></div>
+</div>
+
+<style>
+  :root {
+    --bcn-bg: #FFFFFF; --bcn-surface: #F9FAFB; --bcn-border: #E5E7EB;
+    --bcn-divider: #F3F4F6; --bcn-text-primary: #111827; --bcn-text-body: #374151;
+    --bcn-text-muted: #6B7280; --bcn-text-subtle: #9CA3AF;
+    --bcn-gradient: linear-gradient(to right, #4A9FFF, #7C3AED);
+    --bcn-row-hover: linear-gradient(to right, rgba(74,159,255,.04), rgba(124,58,237,.04));
+    --bcn-blue: #4A9FFF; --bcn-green: #16A34A;
+    --bcn-green-bg: rgba(22,163,74,.08); --bcn-green-border: rgba(22,163,74,.25);
+    --bcn-error: #DC2626;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bcn-bg: #111827; --bcn-surface: #1F2937; --bcn-border: #374151;
+      --bcn-divider: #1F2937; --bcn-text-primary: #F9FAFB; --bcn-text-body: #E5E7EB;
+      --bcn-text-muted: #9CA3AF; --bcn-text-subtle: #6B7280;
+      --bcn-row-hover: linear-gradient(to right, rgba(74,159,255,.07), rgba(124,58,237,.07));
+      --bcn-blue: #4A9FFF; --bcn-green: #22C55E;
+      --bcn-green-bg: rgba(34,197,94,.12); --bcn-green-border: rgba(34,197,94,.3);
+      --bcn-error: #F87171;
+    }
+  }
+  html, .bcn-body { margin:0; padding:0; background:var(--color-background-primary, var(--bcn-bg)); display:block; }
+  .bcn-wrap { border-radius:12px; background:var(--bcn-bg); color:var(--bcn-text-body); font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; border:1px solid var(--bcn-border); overflow:clip; min-width:280px; max-width:640px; }
+  .bcn-wrap::before { content:''; display:block; height:3px; background:var(--bcn-gradient); }
+  .bcn-header { padding:12px 20px; background:var(--bcn-surface); border-bottom:1px solid var(--bcn-border); display:flex; align-items:center; gap:10px; }
+  .bcn-badge { font-size:10px; font-weight:700; letter-spacing:.08em; border-radius:4px; padding:2px 7px; border:1px solid var(--bcn-border); background:var(--bcn-gradient); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+  .bcn-title { font-size:13px; font-weight:600; color:var(--bcn-text-primary); }
+  .bcn-body-inner { padding:8px 0; }
+  .bcn-dir-item { display:flex; align-items:center; gap:8px; padding:8px 20px; border-bottom:1px solid var(--bcn-divider); font-size:12px; transition:all 0.15s ease; }
+  .bcn-dir-item:last-child { border-bottom:none; }
+  .bcn-dir-item:hover { background:var(--bcn-row-hover); }
+  .bcn-dir-name { color:var(--bcn-text-body); flex:1; }
+  .bcn-dir-id { font-size:11px; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; color:var(--bcn-text-subtle); }
+  .bcn-default-badge { font-size:9px; font-weight:700; letter-spacing:.06em; color:var(--bcn-green); background:var(--bcn-green-bg); border:1px solid var(--bcn-green-border); border-radius:3px; padding:1px 5px; }
+  .bcn-node { padding:2px 0; }
+  .bcn-node-row { display:flex; align-items:center; gap:6px; padding:5px 20px; font-size:12px; cursor:default; transition:all 0.15s ease; }
+  .bcn-node-row:hover { background:var(--bcn-row-hover); }
+  .bcn-node-name { color:var(--bcn-text-body); }
+  .bcn-node-id { font-size:11px; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; color:var(--bcn-text-subtle); }
+  .bcn-children { border-left:1px solid var(--bcn-border); margin-left:28px; }
+  .bcn-empty { padding:12px 20px; color:var(--bcn-text-muted); font-size:12px; }
+</style>
+
+<script type="module" src="./hierarchy.js"></script>
+</body>
+</html>

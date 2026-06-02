@@ -243,13 +243,6 @@ WIDGET_TEMPLATES: dict[str, str] = {
 }
 
 
-def render_widget(name: str, data: dict[str, object]) -> str:
-    # Inline data into check() so Claude.ai can artifact the HTML with data already present.
-    return WIDGET_TEMPLATES[name].replace(
-        "var output = window.openai && window.openai.toolOutput;",
-        f"var output = (window.openai && window.openai.toolOutput) || {json.dumps(data)};",
-    )
-
 
 # Normalizes /mcp/ to /mcp — some MCP clients and ngrok send a trailing slash variant.
 class NormalizeSlashMiddleware:
@@ -389,27 +382,30 @@ def hierarchy_template() -> str:
     return WIDGET_TEMPLATES["hierarchy"]
 
 
-@mcp.resource(PREPARE_QUERY_APP_URI, mime_type=MCP_APP_MIME_TYPE)
+_APP_META = {"prefersBorder": False}
+
+
+@mcp.resource(PREPARE_QUERY_APP_URI, mime_type=MCP_APP_MIME_TYPE, meta=_APP_META)
 def prepare_query_app_template() -> str:
     return WIDGET_TEMPLATES["prepare_query"]
 
 
-@mcp.resource(QUERY_EXECUTED_APP_URI, mime_type=MCP_APP_MIME_TYPE)
+@mcp.resource(QUERY_EXECUTED_APP_URI, mime_type=MCP_APP_MIME_TYPE, meta=_APP_META)
 def query_executed_app_template() -> str:
     return WIDGET_TEMPLATES["query_executed"]
 
 
-@mcp.resource(FIELD_VALUES_APP_URI, mime_type=MCP_APP_MIME_TYPE)
+@mcp.resource(FIELD_VALUES_APP_URI, mime_type=MCP_APP_MIME_TYPE, meta=_APP_META)
 def field_values_app_template() -> str:
     return WIDGET_TEMPLATES["field_values"]
 
 
-@mcp.resource(SIMILAR_TEXT_APP_URI, mime_type=MCP_APP_MIME_TYPE)
+@mcp.resource(SIMILAR_TEXT_APP_URI, mime_type=MCP_APP_MIME_TYPE, meta=_APP_META)
 def similar_text_app_template() -> str:
     return WIDGET_TEMPLATES["similar_text"]
 
 
-@mcp.resource(HIERARCHY_APP_URI, mime_type=MCP_APP_MIME_TYPE)
+@mcp.resource(HIERARCHY_APP_URI, mime_type=MCP_APP_MIME_TYPE, meta=_APP_META)
 def hierarchy_app_template() -> str:
     return WIDGET_TEMPLATES["hierarchy"]
 
@@ -433,7 +429,10 @@ def prepare_query(query_name: str) -> types.CallToolResult:
     schema_yaml = MOCK_SCHEMAS.get(key, "")
     data: dict[str, object] = {"query_name": key, "query_label": label, "schema_yaml": schema_yaml}
     return types.CallToolResult.model_validate({
-        "content": [{"type": "text", "text": render_widget("prepare_query", data)}],
+        "content": [
+            {"type": "text", "text": f"Query {key} ({label}) is ready."},
+            {"type": "text", "text": json.dumps(data)},
+        ],
         "structuredContent": data,
     })
 
@@ -453,7 +452,10 @@ def data_preview(query_name: str, query_title: str) -> types.CallToolResult:
     recipe = MOCK_RECIPES.get(query_name.upper(), {})
     data: dict[str, object] = {"query_title": query_title, "result_json": json.dumps(rows), "recipe_json": json.dumps(recipe)}
     return types.CallToolResult.model_validate({
-        "content": [{"type": "text", "text": render_widget("query_executed", data)}],
+        "content": [
+            {"type": "text", "text": f"Query executed: {query_title}"},
+            {"type": "text", "text": json.dumps(data)},
+        ],
         "structuredContent": data,
     })
 
@@ -469,10 +471,13 @@ def preview_field_values(query_name: str, field_name: str) -> types.CallToolResu
     """Preview the possible values for a field in a Beacon query.
     Example: query_name=ZSNAP_F01S_Q01, field_name=CompanyCode
     """
-    data: dict[str, object] = {"field_label": field_name, "table_json": json.dumps(MOCK_COMPANY_CODES)}
+    data: dict[str, object] = {"field_label": "Company Code", "table_json": json.dumps(MOCK_COMPANY_CODES)}
     return types.CallToolResult.model_validate({
-        "content": [{"type": "text", "text": render_widget("field_values", data)}],
-        "structuredContent": {"field_label": "Company Code", "table_json": json.dumps(MOCK_COMPANY_CODES)},
+        "content": [
+            {"type": "text", "text": f"Field values for {field_name} retrieved."},
+            {"type": "text", "text": json.dumps(data)},
+        ],
+        "structuredContent": data,
     })
 
 
@@ -487,10 +492,13 @@ def find_similar_text(query_name: str, search_field: str, text_lookup: str) -> t
     """Find records with text similar to text_lookup in a given field.
     Example: query_name=ZSNAP_F02S_Q01, search_field=VendorName, text_lookup=ACME
     """
-    data: dict[str, object] = {"field_label": search_field, "search_text": text_lookup, "table_json": json.dumps(MOCK_SIMILAR_SUPPLIERS)}
+    data: dict[str, object] = {"field_label": "Supplier Name", "search_text": text_lookup, "table_json": json.dumps(MOCK_SIMILAR_SUPPLIERS)}
     return types.CallToolResult.model_validate({
-        "content": [{"type": "text", "text": render_widget("similar_text", data)}],
-        "structuredContent": {"field_label": "Supplier Name", "search_text": text_lookup, "table_json": json.dumps(MOCK_SIMILAR_SUPPLIERS)},
+        "content": [
+            {"type": "text", "text": f"Found similar text for '{text_lookup}' in {search_field}."},
+            {"type": "text", "text": json.dumps(data)},
+        ],
+        "structuredContent": data,
     })
 
 
@@ -507,15 +515,21 @@ def explore_hierarchy(query_name: str, field_name: str, mode: str = "directory",
     Example: query_name=ZSNAP_GL01_Q01, field_name=GLAccount, mode=tree, hierarchy=ZMED
     """
     if mode == "directory":
-        data: dict[str, object] = {"mode": "directory", "field_label": field_name, "data_json": json.dumps(MOCK_HIERARCHY_DIRECTORY)}
+        data: dict[str, object] = {"mode": "directory", "field_label": "GL Account", "data_json": json.dumps(MOCK_HIERARCHY_DIRECTORY)}
         return types.CallToolResult.model_validate({
-            "content": [{"type": "text", "text": render_widget("hierarchy", data)}],
-            "structuredContent": {"mode": "directory", "field_label": "GL Account", "data_json": json.dumps(MOCK_HIERARCHY_DIRECTORY)},
+            "content": [
+                {"type": "text", "text": f"Hierarchy directory for {field_name}."},
+                {"type": "text", "text": json.dumps(data)},
+            ],
+            "structuredContent": data,
         })
-    data: dict[str, object] = {"mode": "tree", "field_label": field_name, "hierarchy_id": hierarchy, "data_json": json.dumps(MOCK_HIERARCHY_TREE)}
+    data: dict[str, object] = {"mode": "tree", "field_label": "GL Account", "hierarchy_id": hierarchy, "data_json": json.dumps(MOCK_HIERARCHY_TREE)}
     return types.CallToolResult.model_validate({
-        "content": [{"type": "text", "text": render_widget("hierarchy", data)}],
-        "structuredContent": {"mode": "tree", "field_label": "GL Account", "hierarchy_id": hierarchy, "data_json": json.dumps(MOCK_HIERARCHY_TREE)},
+        "content": [
+            {"type": "text", "text": f"Hierarchy tree for {field_name} ({hierarchy})."},
+            {"type": "text", "text": json.dumps(data)},
+        ],
+        "structuredContent": data,
     })
 
 
