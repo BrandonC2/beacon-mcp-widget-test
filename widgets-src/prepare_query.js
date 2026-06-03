@@ -1,4 +1,4 @@
-import { App, applyHostStyleVariables } from "@modelcontextprotocol/ext-apps";
+import { App, applyHostStyleVariables, applyDocumentTheme } from "@modelcontextprotocol/ext-apps";
 
 function render(output) {
   document.getElementById("bcn-qname").textContent = output.query_name || "";
@@ -32,9 +32,13 @@ app.ontoolresult = (result) => {
   }
   setStatus("tool-result received but no data");
 };
-app.connect().then(() => {
-  const ctx = app.getHostContext();
+function applyHostContext(ctx) {
+  if (ctx?.theme) applyDocumentTheme(ctx.theme);
   if (ctx?.styles?.variables) applyHostStyleVariables(ctx.styles.variables);
+}
+app.onhostcontextchanged = applyHostContext;
+app.connect().then(() => {
+  applyHostContext(app.getHostContext());
   setStatus("Waiting for data...");
 }).catch((e) => setStatus("connect failed: " + e.message));
 

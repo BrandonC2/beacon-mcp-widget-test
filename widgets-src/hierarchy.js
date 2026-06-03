@@ -1,4 +1,4 @@
-import { App, applyHostStyleVariables } from "@modelcontextprotocol/ext-apps";
+import { App, applyHostStyleVariables, applyDocumentTheme } from "@modelcontextprotocol/ext-apps";
 
 function renderDir(items, container) {
   items.forEach(function(item) {
@@ -91,10 +91,12 @@ app.ontoolresult = (result) => {
     } catch {}
   }
 };
-app.connect().then(() => {
-  const ctx = app.getHostContext();
+function applyHostContext(ctx) {
+  if (ctx?.theme) applyDocumentTheme(ctx.theme);
   if (ctx?.styles?.variables) applyHostStyleVariables(ctx.styles.variables);
-});
+}
+app.onhostcontextchanged = applyHostContext;
+app.connect().then(() => { applyHostContext(app.getHostContext()); });
 
 var _checkAttempts = 0;
 function check() {
